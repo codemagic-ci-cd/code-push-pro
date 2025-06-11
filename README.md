@@ -4,12 +4,7 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 ## Installation
 
-To run the CodePush CLI, follow these steps:
-
-1. Clone the CodePush Service repository.
-1. Install the necessary dependencies by running `npm install`.
-1. Build the CLI by running `npm run build`.
-1. Install CLI globally by running `npm install -g`.
+`npm install -g @codemagic/code-push-cli`.
 
 ## Getting started
 
