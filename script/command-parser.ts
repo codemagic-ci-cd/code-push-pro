@@ -9,7 +9,7 @@ import parseDuration = require("parse-duration");
 
 const packageJson = require("../../package.json");
 const ROLLOUT_PERCENTAGE_REGEX: RegExp = /^(100|[1-9][0-9]|[1-9])%?$/;
-const USAGE_PREFIX = "Usage: code-push-pro";
+const USAGE_PREFIX = "Usage: code-push";
 
 // Command categories are:  access-key, app, release, deployment, deployment-key, login, logout, register
 let isValidCommandCategory = false;

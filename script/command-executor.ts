@@ -454,7 +454,7 @@ export function execute(command: cli.ICommand) {
 
         if (!connectionInfo) {
           throw new Error(
-            "You are not currently logged in. Run the 'code-push-pro login' command to authenticate with the CodePush server."
+            "You are not currently logged in. Run the 'code-push login' command to authenticate with the CodePush server."
           );
         }
 
@@ -1521,7 +1521,7 @@ function sessionList(command: cli.ISessionListCommand): Promise<void> {
 
 function sessionRemove(command: cli.ISessionRemoveCommand): Promise<void> {
   if (os.hostname() === command.machineName) {
-    throw new Error("Cannot remove the current login session via this command. Please run 'code-push-pro logout' instead.");
+    throw new Error("Cannot remove the current login session via this command. Please run 'code-push logout' instead.");
   } else {
     return confirm().then((wasConfirmed: boolean): Promise<void> => {
       if (wasConfirmed) {
