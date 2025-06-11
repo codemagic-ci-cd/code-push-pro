@@ -16,9 +16,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoft/code-push-server"
+    "url": "https://github.com/codemagic-ci-cd/code-push-pro"
   },
-  "author": "Microsoft",
+  "author": "Codemagic",
   "dependencies": {
     "backslash": "^0.2.0",
     "chalk": "^4.1.2",
