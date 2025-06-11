@@ -1,5 +1,5 @@
 {
-  "name": "@code-magic/code-push-cli",
+  "name": "@codemagic/code-push-cli",
   "version": "0.0.1",
   "description": "Management CLI for the CodePush service",
   "main": "./script/cli.js",
