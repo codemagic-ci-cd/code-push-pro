@@ -18,37 +18,15 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 After installing CodePush CLI globally, it will be available under `code-push`.
 
-## Account Management
-
-Before you can begin releasing app updates, you need to create a CodePush account. You can do this by simply running the following command once you've installed the CLI:
-
-```
-code-push register <optional: server-url>
-```
-
-This will launch a browser, asking you to authenticate with either your GitHub or Microsoft account. Once authenticated, it will create a CodePush account "linked" to your GitHub/MSA identity, and generate an access key you can copy/paste into the CLI in order to login.
-
-_Note: After registering, you are automatically logged-in with the CLI, so until you explicitly log out, you don't need to login again from the same machine._
-
-If you have an existing account, you may also link your account to another identity provider (e.g. Microsoft, GitHub) by running:
-
-```
-code-push link
-```
-
-_Note: In order to link multiple accounts, the email address associated with each provider must match._
-
 ### Authentication
 
-Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using the GitHub or Microsoft account you used when registering. You can do this by running the following command:
+Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the Codemagic team. Then, you can log into your account by running the following command:
 
 ```shell
-code-push login <optional: server-url>
+code-push login <server_url> --access-key $ACCESS_TOKEN
 ```
 
-This will launch a browser, asking you to authenticate with either your GitHub or Microsoft account. This will generate an access key that you need to copy/paste into the CLI (it will prompt you for it). You are now successfully authenticated and can safely close your browser window.
-
-If at any time you want to determine if you're already logged in, you can run the following command to display the e-mail address associated with your current authentication session, which identity providers your account is linked to (e.g. GitHub):
+If at any time you want to determine if you're already logged in, you can run the following command to display your CodePush account associated with your current authentication session:
 
 ```shell
 code-push whoami
@@ -69,7 +47,7 @@ code-push session rm <machineName>
 
 ### Access Keys
 
-If you need to be able to authenticate against the CodePush service without launching a browser and/or without needing to use your GitHub and/or Microsoft credentials (e.g. in a CI environment), you can run the following command to create an "access key" (along with a name describing what it is for):
+You can run the following command to create an additional "access key" (along with a name describing what it is for):
 
 ```shell
 code-push access-key add "VSTS Integration"
@@ -134,56 +112,6 @@ you can run the following command:
 ```
 code-push app ls
 ```
-
-### App Collaboration
-
-If you will be working with other developers on the same CodePush app, you can add them as collaborators using the following command:
-
-```shell
-code-push collaborator add <appName> <collaboratorEmail>
-```
-
-_NOTE: This expects the developer to have already [registered](#account-creation) with CodePush using the specified e-mail address, so ensure that they have done that before attempting to share the app with them._
-
-Once added, all collaborators will immediately have the following permissions with regards to the newly shared app:
-
-1. View the app, its collaborators, [deployments](#deployment-management) and [release history](#viewing-release-history)
-1. [Release](#releasing-updates) updates to any of the app's deployments
-1. [Promote](#promoting-updates) an update between any of the app's deployments
-1. [Rollback](#rolling-back-undesired-updates) any of the app's deployments
-1. [Patch](#updating-existing-releases) any releases within any of the app's deployments
-
-Inversely, that means that an app collaborator cannot do any of the following:
-
-1. Rename or delete the app
-1. Transfer ownership of the app
-1. Create, rename or delete new deployments within the app
-1. Clear a deployment's release history
-1. Add or remove collaborators from the app (\*)
-
-_NOTE: A developer can remove him/herself as a collaborator from an app that was shared with them._
-
-Over time, if someone is no longer working on an app with you, you can remove them as a collaborator using the following command:
-
-```shell
-code-push collaborator rm <appName> <collaboratorEmail>
-```
-
-If at any time you want to list all collaborators that have been added to an app, you can simply run the following command:
-
-```shell
-code-push collaborator ls <appName>
-```
-
-Finally, if at some point, you (as the app owner) will no longer be working on the app, and you want to transfer it to another developer (or a client), you can run the following command:
-
-```shell
-code-push app transfer <appName> <newOwnerEmail>
-```
-
-_NOTE: Just like with the `code-push collaborator add` command, this expects that the new owner has already registered with CodePush using the specified e-mail address._
-
-Once confirmed, the specified developer becomes the app's owner and immediately receives the permissions associated with that role. Besides the transfer of ownership, nothing else about the app is modified (e.g. deployments, release history, collaborators). This means that you will still be a collaborator of the app, and therefore, if you want to remove yourself, you simply need to run the `code-push collaborator rm` command after successfully transferring ownership.
 
 ### Deployment Management
 
