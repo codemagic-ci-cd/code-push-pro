@@ -20,7 +20,7 @@ After installing CodePush CLI globally, it will be available under `code-push`.
 
 ### Authentication
 
-Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the Codemagic team. Then, you can log into your account by running the following command:
+Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the [Codemagic](https://codemagic.io/contact) team. Then, you can log into your account by running the following command:
 
 ```shell
 code-push login <server_url> --access-key $ACCESS_TOKEN
