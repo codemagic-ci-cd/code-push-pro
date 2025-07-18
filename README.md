@@ -8,7 +8,7 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 ## Getting started
 
-1. Create a [CodePush account](#account-creation) push using the CodePush CLI.
+1. Create a CodePush account by contacting the [Codemagic](https://codemagic.io/contact) team.
 1. Register your app with CodePush, and optionally share it with other developers on your team.
 1. CodePush-ify your app and point it at the deployment you wish to use.
 1. Release an update for your app.
