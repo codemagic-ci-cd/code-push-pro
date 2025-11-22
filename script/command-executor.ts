@@ -217,7 +217,7 @@ function appRename(command: cli.IAppRenameCommand): Promise<void> {
 
 export const createEmptyTempReleaseFolder = (folderPath: string) => {
   return deleteFolder(folderPath).then(() => {
-    fs.mkdirSync(folderPath);
+    fs.mkdirSync(folderPath, { recursive: true });
   });
 };
 
@@ -1265,7 +1265,10 @@ export const release = (command: cli.IReleaseCommand): Promise<void> => {
 export const releaseReact = (command: cli.IReleaseReactCommand): Promise<void> => {
   let bundleName: string = command.bundleName;
   let entryFile: string = command.entryFile;
-  const outputFolder: string = command.outputDir || path.join(os.tmpdir(), "CodePush");
+  let outputFolder: string = command.outputDir || path.join(os.tmpdir(), "CodePush");
+  if (command.outputDir && path.basename(outputFolder) !== "CodePush") {
+    outputFolder = path.join(outputFolder, "CodePush");
+  }
   const platform: string = (command.platform = command.platform.toLowerCase());
   const releaseCommand: cli.IReleaseCommand = <any>command;
   // Check for app and deployment exist before releasing an update.
