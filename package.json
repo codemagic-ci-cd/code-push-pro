@@ -10,7 +10,7 @@
     "prettier": "prettier --write \"./**/*.ts\"",
     "lint": "npx eslint ./script/**/*.ts",
     "lint:fix": "npx eslint ./script/**/*.ts --fix",
-    "test": "mocha 'bin/test/*.js'",
+    "test": "npm run build && mocha 'bin/test/*.js'",
     "postinstall": "patch-package"
   },
   "bin": {
