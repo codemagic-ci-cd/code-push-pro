@@ -275,7 +275,10 @@ describe("CLI", () => {
 
     sandbox = sinon.createSandbox();
 
-    sandbox.stub(cmdexec, "confirm").returns(
+    // Inject SdkStub to skip authentication and use stub instead of real server
+    (cmdexec as any).sdk = new SdkStub();
+
+    sandbox.stub(cmdexec, "confirm").callsFake(() =>
       Q.Promise((resolve) => {
         resolve(wasConfirmed);
       })
