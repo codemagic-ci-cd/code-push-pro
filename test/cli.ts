@@ -9,6 +9,7 @@ import * as codePush from "../script/types";
 import * as cli from "../script/types/cli";
 import * as cmdexec from "../script/command-executor";
 import * as os from "os";
+import moment = require("moment");
 
 function assertJsonDescribesObject(json: string, object: Object): void {
   // Make sure JSON is indented correctly
@@ -68,11 +69,11 @@ export class SdkStub {
     });
   }
 
-  public patchAccessKey(newName?: string, newTtl?: number): Q.Promise<codePush.AccessKey> {
+  public patchAccessKey(oldName?: string, newName?: string, ttl?: number): Q.Promise<codePush.AccessKey> {
     return Q(<codePush.AccessKey>{
       createdTime: new Date().getTime(),
-      name: newName,
-      expires: NOW + (isDefined(newTtl) ? newTtl : DEFAULT_ACCESS_KEY_MAX_AGE),
+      name: isDefined(newName) ? newName : oldName,
+      expires: NOW + (isDefined(ttl) ? ttl : DEFAULT_ACCESS_KEY_MAX_AGE),
     });
   }
 
@@ -275,7 +276,10 @@ describe("CLI", () => {
 
     sandbox = sinon.createSandbox();
 
-    sandbox.stub(cmdexec, "confirm").returns(
+    // Inject SdkStub to skip authentication and use stub instead of real server
+    (cmdexec as any).sdk = new SdkStub();
+
+    sandbox.stub(cmdexec, "confirm").callsFake(() =>
       Q.Promise((resolve) => {
         resolve(wasConfirmed);
       })
@@ -376,7 +380,8 @@ describe("CLI", () => {
       assert.equal(log.args[0].length, 1);
 
       var actual: string = log.args[0][0];
-      var expected = `Successfully changed the expiration date of the "Test name" access key to Wednesday, August 17, 2016 12:07 PM.`;
+      var expectedDate = moment(NOW + ttl).format("LLLL");
+      var expected = `Successfully changed the expiration date of the "Test name" access key to ${expectedDate}.`;
 
       assert.equal(actual, expected);
       done();
@@ -397,7 +402,8 @@ describe("CLI", () => {
       assert.equal(log.args[0].length, 1);
 
       var actual: string = log.args[0][0];
-      var expected = `Successfully renamed the access key "Test name" to "Updated name" and changed its expiration date to Wednesday, August 17, 2016 12:07 PM.`;
+      var expectedDate = moment(NOW + ttl).format("LLLL");
+      var expected = `Successfully renamed the access key "Test name" to "Updated name" and changed its expiration date to ${expectedDate}.`;
 
       assert.equal(actual, expected);
       done();
@@ -838,7 +844,7 @@ describe("CLI", () => {
       assert.equal(log.args[0].length, 1);
 
       var actual: string = log.args[0][0];
-      var expected: codePush.Package[] = [
+      var expected = [
         {
           description: null,
           appVersion: "1.0.0",
@@ -848,6 +854,13 @@ describe("CLI", () => {
           uploadTime: 1447113596270,
           size: 1,
           label: "v1",
+          metrics: {
+            active: 789,
+            downloaded: 456,
+            failed: 654,
+            installed: 987,
+            totalActive: 1035,
+          },
         },
         {
           description: "New update - this update does a whole bunch of things, including testing linewrapping",
@@ -858,6 +871,13 @@ describe("CLI", () => {
           uploadTime: 1447118476669,
           size: 2,
           label: "v2",
+          metrics: {
+            active: 123,
+            downloaded: 321,
+            failed: 789,
+            installed: 456,
+            totalActive: 1035,
+          },
         },
       ];
 
@@ -973,6 +993,7 @@ describe("CLI", () => {
       sourceDeploymentName: "Staging",
       destDeploymentName: "Production",
       description: "Promoted",
+      label: null,
       mandatory: true,
       rollout: 25,
       appStoreVersion: "1.0.1",
@@ -999,6 +1020,7 @@ describe("CLI", () => {
       sourceDeploymentName: "Staging",
       destDeploymentName: "Production",
       description: "Promoted",
+      label: null,
       mandatory: true,
       rollout: 25,
       appStoreVersion: null,
@@ -1257,7 +1279,7 @@ describe("CLI", () => {
         assert.equal(spawnCommand, "node");
         assert.equal(
           spawnCommandArgs,
-          `${path.join("node_modules", "react-native", "local-cli", "cli.js")} bundle --assets-dest ${path.join(
+          `${path.join("node_modules", "react-native", "cli.js")} bundle --assets-dest ${path.join(
             os.tmpdir(),
             "CodePush"
           )} --bundle-output ${path.join(os.tmpdir(), "CodePush", bundleName)} --dev false --entry-file index.ios.js --platform ios`
@@ -1301,7 +1323,6 @@ describe("CLI", () => {
           `${path.join(
             "node_modules",
             "react-native",
-            "local-cli",
             "cli.js"
           )} bundle --assets-dest ${packagePath} --bundle-output ${path.join(
             packagePath,
@@ -1347,7 +1368,6 @@ describe("CLI", () => {
           `${path.join(
             "node_modules",
             "react-native",
-            "local-cli",
             "cli.js"
           )} bundle --assets-dest ${packagePath} --bundle-output ${path.join(
             packagePath,
@@ -1393,7 +1413,6 @@ describe("CLI", () => {
           `${path.join(
             "node_modules",
             "react-native",
-            "local-cli",
             "cli.js"
           )} bundle --assets-dest ${packagePath} --bundle-output ${path.join(
             packagePath,
@@ -1439,7 +1458,7 @@ describe("CLI", () => {
         assert.equal(spawnCommand, "node");
         assert.equal(
           spawnCommandArgs,
-          `${path.join("node_modules", "react-native", "local-cli", "cli.js")} bundle --assets-dest ${path.join(
+          `${path.join("node_modules", "react-native", "cli.js")} bundle --assets-dest ${path.join(
             os.tmpdir(),
             "CodePush"
           )} --bundle-output ${path.join(
@@ -1486,7 +1505,7 @@ describe("CLI", () => {
         assert.equal(spawnCommand, "node");
         assert.equal(
           spawnCommandArgs,
-          `${path.join("node_modules", "react-native", "local-cli", "cli.js")} bundle --assets-dest ${path.join(
+          `${path.join("node_modules", "react-native", "cli.js")} bundle --assets-dest ${path.join(
             os.tmpdir(),
             "CodePush"
           )} --bundle-output ${path.join(
@@ -1532,7 +1551,7 @@ describe("CLI", () => {
         assert.equal(spawnCommand, "node");
         assert.equal(
           spawnCommandArgs,
-          `${path.join("node_modules", "react-native", "local-cli", "cli.js")} bundle --assets-dest ${path.join(
+          `${path.join("node_modules", "react-native", "cli.js")} bundle --assets-dest ${path.join(
             os.tmpdir(),
             "CodePush"
           )} --bundle-output ${path.join(
@@ -1581,7 +1600,7 @@ describe("CLI", () => {
         assert.equal(spawnCommand, "node");
         assert.equal(
           spawnCommandArgs,
-          `--foo=bar --baz ${path.join("node_modules", "react-native", "local-cli", "cli.js")} bundle --assets-dest ${path.join(
+          `--foo=bar --baz ${path.join("node_modules", "react-native", "cli.js")} bundle --assets-dest ${path.join(
             os.tmpdir(),
             "CodePush"
           )} --bundle-output ${path.join(os.tmpdir(), "CodePush", bundleName)} --dev false --entry-file index.ios.js --platform ios`

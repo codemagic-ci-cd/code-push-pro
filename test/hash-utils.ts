@@ -5,7 +5,7 @@ import * as assert from "assert";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as hashUtils from "../script/hash-utils";
-var mkdirp = require("mkdirp");
+import { mkdirp } from "mkdirp";
 import * as os from "os";
 import * as path from "path";
 import * as q from "q";
@@ -26,42 +26,47 @@ function unzipToDirectory(zipPath: string, directoryPath: string): Promise<void>
   var deferred: q.Deferred<void> = q.defer<void>();
   var originalCwd: string = process.cwd();
 
-  mkdirp(directoryPath, (err: Error) => {
-    if (err) throw err;
-    process.chdir(directoryPath);
+  mkdirp(directoryPath)
+    .then(() => {
+      process.chdir(directoryPath);
 
-    yauzl.open(zipPath, { lazyEntries: true }, function (err: Error, zipfile: any) {
-      if (err) throw err;
-      zipfile.readEntry();
-      zipfile.on("entry", function (entry: any) {
-        if (/\/$/.test(entry.fileName)) {
-          // directory file names end with '/'
-          mkdirp(entry.fileName, function (err: Error) {
-            if (err) throw err;
-            zipfile.readEntry();
-          });
-        } else {
-          // file entry
-          zipfile.openReadStream(entry, function (err: Error, readStream: any) {
-            if (err) throw err;
-            // ensure parent directory exists
-            mkdirp(path.dirname(entry.fileName), function (err: Error) {
-              if (err) throw err;
-              readStream.pipe(fs.createWriteStream(entry.fileName));
-              readStream.on("end", function () {
-                zipfile.readEntry();
-              });
-            });
-          });
+      yauzl.open(zipPath, { lazyEntries: true }, function (err: Error, zipfile: any) {
+        if (err) {
+          deferred.reject(err);
+          return;
         }
-      });
+        zipfile.readEntry();
+        zipfile.on("entry", function (entry: any) {
+          if (/\/$/.test(entry.fileName)) {
+            // directory file names end with '/'
+            mkdirp(entry.fileName)
+              .then(() => zipfile.readEntry())
+              .catch((err: Error) => deferred.reject(err));
+          } else {
+            // file entry - ensure parent directory exists
+            mkdirp(path.dirname(entry.fileName))
+              .then(() => {
+                zipfile.openReadStream(entry, function (err: Error, readStream: any) {
+                  if (err) {
+                    deferred.reject(err);
+                    return;
+                  }
+                  readStream.pipe(fs.createWriteStream(entry.fileName));
+                  readStream.on("end", function () {
+                    zipfile.readEntry();
+                  });
+                });
+              })
+              .catch((err: Error) => deferred.reject(err));
+          }
+        });
 
-      zipfile.on("end", function (err: Error) {
-        if (err) deferred.reject(err);
-        else deferred.resolve(<void>null);
+        zipfile.on("end", function () {
+          deferred.resolve(<void>null);
+        });
       });
-    });
-  });
+    })
+    .catch((err: Error) => deferred.reject(err));
 
   return deferred.promise.finally(() => {
     process.chdir(originalCwd);
