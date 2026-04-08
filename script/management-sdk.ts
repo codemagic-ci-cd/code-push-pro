@@ -40,6 +40,10 @@ interface PackageFile {
   path: string;
 }
 
+function normalizeServerErrorMessage(message: string): string {
+  return message ? message.replace(/code-push-standalone/g, "code-push") : message;
+}
+
 // A template string tag function that URL encodes the substituted values
 function urlEncode(strings: string[], ...values: string[]): string {
   let result = "";
@@ -526,12 +530,12 @@ class AccountManager {
         } else {
           if (body) {
             reject(<CodePushError>{
-              message: body.message,
+              message: normalizeServerErrorMessage(body.message),
               statusCode: this.getErrorStatus(err, res),
             });
           } else {
             reject(<CodePushError>{
-              message: res.text,
+              message: normalizeServerErrorMessage(res.text),
               statusCode: this.getErrorStatus(err, res),
             });
           }
@@ -556,7 +560,7 @@ class AccountManager {
   }
 
   private getErrorMessage(error: Error, response: superagent.Response): string {
-    return response && response.text ? response.text : error.message;
+    return normalizeServerErrorMessage(response && response.text ? response.text : error.message);
   }
 
   private attachCredentials(request: superagent.Request<any>): void {
