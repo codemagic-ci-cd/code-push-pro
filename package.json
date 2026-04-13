@@ -74,6 +74,6 @@
     "yauzl": "^3.2.0"
   },
   "overrides": {
-    "form-data": "4.0.1"
+    "form-data": "4.0.4"
   }
 }
