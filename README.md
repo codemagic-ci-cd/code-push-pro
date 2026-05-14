@@ -459,7 +459,7 @@ _NOTE: This parameter can be set using either --outputDir or -o_
 
 #### Use Hermes parameter
 
-This parameter forces the use of the Hermes compiler. If not specified, automatic checks will inspect Android `gradle.properties`, legacy Android `build.gradle` `project.ext.react.enableHermes` settings, iOS `Podfile` `hermes_enabled` settings, and React Native 0.84+ default Hermes behavior.
+This parameter forces the use of the Hermes compiler. If not specified, automatic checks will inspect Android `gradle.properties`, legacy Android `build.gradle` `project.ext.react.enableHermes` settings, iOS `Podfile` `hermes_enabled` settings, and React Native 0.70+ default Hermes behavior.
 
 Explicit `hermesEnabled=false` in `android/gradle.properties` or `hermes_enabled: false` / `:hermes_enabled => false` in the `Podfile` disables automatic Hermes compilation for that platform.
 
