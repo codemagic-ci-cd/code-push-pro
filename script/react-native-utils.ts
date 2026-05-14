@@ -138,11 +138,8 @@ export async function runHermesEmitBinaryCommand(
 }
 
 function parseBuildGradleFile(gradleFile: string) {
-  let buildGradlePath: string = path.join("android", "app");
-  if (gradleFile) {
-    buildGradlePath = gradleFile;
-  }
-  if (fs.lstatSync(buildGradlePath).isDirectory()) {
+  let buildGradlePath: string = getBuildGradlePath(gradleFile);
+  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
     buildGradlePath = path.join(buildGradlePath, "build.gradle");
   }
 
@@ -153,6 +150,19 @@ function parseBuildGradleFile(gradleFile: string) {
   return g2js.parseFile(buildGradlePath).catch(() => {
     throw new Error(`Unable to parse the "${buildGradlePath}" file. Please ensure it is a well-formed Gradle file.`);
   });
+}
+
+function getBuildGradlePath(gradleFile: string): string {
+  let buildGradlePath: string = path.join("android", "app");
+  if (gradleFile) {
+    buildGradlePath = gradleFile;
+  }
+
+  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
+    return path.join(buildGradlePath, "build.gradle");
+  }
+
+  return buildGradlePath;
 }
 
 async function getHermesCommandFromGradle(gradleFile: string): Promise<string> {
@@ -167,6 +177,18 @@ async function getHermesCommandFromGradle(gradleFile: string): Promise<string> {
   }
 }
 
+function getLegacyAndroidHermesEnabled(buildGradle: any): boolean | null {
+  const hermesEnabledProperty = Array.from(buildGradle["project.ext.react"] || []).find((line: string) =>
+    /^enableHermes\s*:\s*(true|false)\b/.test(line)
+  ) as string;
+
+  if (hermesEnabledProperty) {
+    return /:\s*true\b/.test(hermesEnabledProperty);
+  }
+
+  return null;
+}
+
 export async function getAndroidHermesEnabled(gradleFile: string): Promise<boolean> {
   const gradlePropertiesPath = path.join("android", "gradle.properties");
   if (fs.existsSync(gradlePropertiesPath)) {
@@ -177,19 +199,18 @@ export async function getAndroidHermesEnabled(gradleFile: string): Promise<boole
     }
   }
 
+  const buildGradlePath = getBuildGradlePath(gradleFile);
+  if (fs.existsSync(buildGradlePath) && fs.readFileSync(buildGradlePath).toString().indexOf("enableHermes") !== -1) {
+    const buildGradle: any = await parseBuildGradleFile(gradleFile);
+    const legacyHermesEnabled = getLegacyAndroidHermesEnabled(buildGradle);
+    if (legacyHermesEnabled !== null) {
+      return legacyHermesEnabled;
+    }
+  }
+
   const reactNativeVersion = coerce(getReactNativeVersion());
   if (reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0) {
     return true;
-  }
-
-  if (gradleFile || fs.existsSync(path.join("android", "app", "build.gradle"))) {
-    const buildGradle: any = await parseBuildGradleFile(gradleFile);
-    const legacyHermesEnabled = Array.from(buildGradle["project.ext.react"] || []).some((line: string) =>
-      /^enableHermes\s{0,}:\s{0,}true/.test(line)
-    );
-    if (legacyHermesEnabled) {
-      return true;
-    }
   }
 
   return false;
@@ -261,10 +282,7 @@ async function getHermesCommand(gradleFile: string): Promise<string> {
     }
   };
 
-  let buildGradlePath = gradleFile || path.join("android", "app", "build.gradle");
-  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
-    buildGradlePath = path.join(buildGradlePath, "build.gradle");
-  }
+  const buildGradlePath = getBuildGradlePath(gradleFile);
 
   if (fs.existsSync(buildGradlePath) && fs.readFileSync(buildGradlePath).toString().indexOf("hermesCommand") !== -1) {
     const gradleHermesCommand = await getHermesCommandFromGradle(gradleFile);

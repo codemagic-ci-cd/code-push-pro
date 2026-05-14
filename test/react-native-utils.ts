@@ -110,6 +110,13 @@ describe("react-native-utils", () => {
     assert.equal(await getAndroidHermesEnabled(null), false);
   });
 
+  it("keeps Android Hermes enabled when React Native 0.84 opts out of Hermes V1 only", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.84.1");
+    writeFile(path.join(projectPath, "android", "gradle.properties"), "hermesV1Enabled=false");
+
+    assert.equal(await getAndroidHermesEnabled(null), true);
+  });
+
   it("honors Android hermesEnabled=true in gradle.properties", async (): Promise<void> => {
     writeReactNativeProject(projectPath, "0.83.0");
     writeFile(path.join(projectPath, "android", "gradle.properties"), "hermesEnabled=true");
@@ -135,6 +142,26 @@ android {
     );
 
     assert.equal(await getAndroidHermesEnabled(null), true);
+  });
+
+  it("honors legacy Android enableHermes=false before the React Native 0.70 default", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.84.1");
+    writeFile(
+      path.join(projectPath, "android", "app", "build.gradle"),
+      `
+project.ext.react = [
+    enableHermes: false,
+]
+
+android {
+    defaultConfig {
+        versionName "1.0.0"
+    }
+}
+`
+    );
+
+    assert.equal(await getAndroidHermesEnabled(null), false);
   });
 
   it("leaves Android React Native versions below 0.70 disabled without explicit Hermes config", async (): Promise<void> => {
