@@ -8,11 +8,12 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 ## Getting started
 
-1. Create a CodePush account by contacting the [Codemagic](https://codemagic.io/contact) team.
-1. Register your app with CodePush, and optionally share it with other developers on your team.
-1. CodePush-ify your app and point it at the deployment you wish to use.
+1. Obtain a CodePush access key from Codemagic.
+1. Authenticate the CLI with the access key.
+1. Register your app with CodePush.
+1. Configure your app with the CodePush server URL and deployment key.
 1. Release an update for your app.
-1. Check out the debug logs to ensure everything is working as expected.
+1. Check the debug logs to ensure everything is working as expected.
 
 ## Usage
 
@@ -20,56 +21,43 @@ After installing CodePush CLI globally, it will be available under `code-push`.
 
 ### Authentication
 
-Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the [Codemagic](https://codemagic.io/contact) team. Then, you can log into your account by running the following command:
+Most CodePush CLI management commands require authentication. Codemagic-managed CodePush authenticates with access keys generated in Codemagic.
+
+To log in interactively, run:
+
+```shell
+code-push login
+```
+
+The CLI targets `https://codepush.pro` by default and prompts for your access key.
+
+For non-interactive environments such as CI, pass the access key directly:
+
+```shell
+code-push login --access-key $ACCESS_TOKEN
+```
+
+For local development, self-hosted servers, or tests, you can still provide an explicit server URL:
 
 ```shell
 code-push login <server_url> --access-key $ACCESS_TOKEN
 ```
 
-If at any time you want to determine if you're already logged in, you can run the following command to display your CodePush account associated with your current authentication session:
+If at any time you want to determine whether you're already logged in, run:
 
 ```shell
 code-push whoami
 ```
 
-When you login from the CLI, your access key is persisted to disk for the duration of your session so that you don't have to login every time you attempt to access your account. In order to end your session and delete this access key, simply run the following command:
+When you log in from the CLI, your access key is persisted to disk so that you don't have to log in before every command. To remove the local credentials, run:
 
 ```shell
 code-push logout
 ```
 
-If you forget to logout from a machine you'd prefer not to leave a running session on (e.g. your friend's laptop), you can use the following commands to list and remove any current login sessions.
-
-```shell
-code-push session ls
-code-push session rm <machineName>
-```
-
 ### Access Keys
 
-You can run the following command to create an additional "access key" (along with a name describing what it is for):
-
-```shell
-code-push access-key add "VSTS Integration"
-```
-
-By default, access keys expire in 60 days. You can specify a different expiry duration by using the `--ttl` option and passing in a [human readable duration string](https://github.com/jkroso/parse-duration#parsestr) (e.g. "2d" => 2 days, "1h 15 min" => 1 hour and 15 minutes). For security, the key will only be shown once on creation, so remember to save it somewhere if needed!
-
-After creating the new key, you can specify its value using the `--accessKey` flag of the `login` command, which allows you to perform "headless" authentication, as opposed to launching a browser.
-
-```shell
-code-push login --accessKey <accessKey>
-```
-
-When logging in via this method, the access key will not be automatically invalidated on logout, and can be used in future sessions until it is explicitly removed from the CodePush server or expires. However, it is still recommended that you log out once your session is complete, in order to remove your credentials from disk.
-
-Finally, if at any point you need to change a key's name and/or expiration date, you can use the following command:
-
-```shell
-code-push access-key patch <accessKeyName> --name "new name" --ttl 10d
-```
-
-_NOTE: When patching the TTL of an existing access key, its expiration date will be set relative to the current time, with no regard for its previous value._
+For Codemagic-managed CodePush, access keys are generated and revoked in Codemagic. The CLI also includes access-key management commands for environments that expose those APIs, but they are not required for the managed setup.
 
 ## App Management
 
