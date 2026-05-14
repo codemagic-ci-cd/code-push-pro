@@ -8,9 +8,9 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 ## Getting started
 
-1. Create a CodePush account by contacting the [Codemagic](https://codemagic.io/contact) team.
-1. Register your app with CodePush, and optionally share it with other developers on your team.
-1. CodePush-ify your app and point it at the deployment you wish to use.
+1. Obtain a CodePush access key from Codemagic.
+1. Register your app with CodePush.
+1. Configure your app with the CodePush SDK, server URL, and deployment key.
 1. Release an update for your app.
 1. Check out the debug logs to ensure everything is working as expected.
 
@@ -20,10 +20,22 @@ After installing CodePush CLI globally, it will be available under `code-push`.
 
 ### Authentication
 
-Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the [Codemagic](https://codemagic.io/contact) team. Then, you can log into your account by running the following command:
+Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your apps, you need to login using an access key generated in Codemagic. Then, you can log into your account by running the following command:
 
 ```shell
-code-push login <server_url> --access-key $ACCESS_TOKEN
+code-push login
+```
+
+The CLI targets `https://codepush.pro` by default and prompts for your access key. For non-interactive environments, you can pass the access key directly:
+
+```shell
+code-push login --access-key $CODEPUSH_ACCESS_KEY
+```
+
+If you need to target another server, you can provide the server URL explicitly:
+
+```shell
+code-push login <server_url> --access-key $CODEPUSH_ACCESS_KEY
 ```
 
 If at any time you want to determine if you're already logged in, you can run the following command to display your CodePush account associated with your current authentication session:
@@ -32,44 +44,15 @@ If at any time you want to determine if you're already logged in, you can run th
 code-push whoami
 ```
 
-When you login from the CLI, your access key is persisted to disk for the duration of your session so that you don't have to login every time you attempt to access your account. In order to end your session and delete this access key, simply run the following command:
+When you login from the CLI, your access key is persisted to disk for the duration of your session so that you don't have to login every time you attempt to access your account. In order to end your session and remove this local credential, simply run the following command:
 
 ```shell
 code-push logout
 ```
 
-If you forget to logout from a machine you'd prefer not to leave a running session on (e.g. your friend's laptop), you can use the following commands to list and remove any current login sessions.
-
-```shell
-code-push session ls
-code-push session rm <machineName>
-```
-
 ### Access Keys
 
-You can run the following command to create an additional "access key" (along with a name describing what it is for):
-
-```shell
-code-push access-key add "VSTS Integration"
-```
-
-By default, access keys expire in 60 days. You can specify a different expiry duration by using the `--ttl` option and passing in a [human readable duration string](https://github.com/jkroso/parse-duration#parsestr) (e.g. "2d" => 2 days, "1h 15 min" => 1 hour and 15 minutes). For security, the key will only be shown once on creation, so remember to save it somewhere if needed!
-
-After creating the new key, you can specify its value using the `--accessKey` flag of the `login` command, which allows you to perform "headless" authentication, as opposed to launching a browser.
-
-```shell
-code-push login --accessKey <accessKey>
-```
-
-When logging in via this method, the access key will not be automatically invalidated on logout, and can be used in future sessions until it is explicitly removed from the CodePush server or expires. However, it is still recommended that you log out once your session is complete, in order to remove your credentials from disk.
-
-Finally, if at any point you need to change a key's name and/or expiration date, you can use the following command:
-
-```shell
-code-push access-key patch <accessKeyName> --name "new name" --ttl 10d
-```
-
-_NOTE: When patching the TTL of an existing access key, its expiration date will be set relative to the current time, with no regard for its previous value._
+For Codemagic-managed CodePush, access keys are generated and revoked in Codemagic. The CLI also includes access-key management commands for environments that expose those APIs, but they are not required for the managed setup.
 
 ## App Management
 
@@ -88,7 +71,7 @@ code-push app add MyApp-iOS
 
 _NOTE: Using the same app for iOS and Android may cause installation exceptions because the CodePush update package produced for iOS will have different content from the update produced for Android._
 
-All new apps automatically come with two deployments (`Staging` and `Production`) so that you can begin distributing updates to multiple channels without needing to do anything extra (see deployment instructions below). After you create an app, the CLI will output the deployment keys for the `Staging` and `Production` deployments, which you can begin using to configure your mobile clients with the [React Native](http://github.com/Microsoft/react-native-code-push) SDK.
+All new apps automatically come with two deployments (`Staging` and `Production`) so that you can begin distributing updates to multiple channels without needing to do anything extra (see deployment instructions below). After you create an app, the CLI will output the deployment keys for the `Staging` and `Production` deployments, which you can begin using to configure your mobile clients with the [`@code-push-next/react-native-code-push`](https://www.npmjs.com/package/@code-push-next/react-native-code-push) SDK.
 
 If you decide that you don't like the name you gave to an app, you can rename it at any time using the following command:
 
@@ -156,9 +139,9 @@ The install metrics have the following meaning:
 
 - **Active** - The number of successful installs that are currently running this release (i.e. if the user opened your app, they would see/run this version). This number will increase and decrease as end-users upgrade to and away from this release, respectively. This metric shows both the total of active users, as well as what percentage of your overall audience that represents. This makes it easy to determine the distribution of updates that your users are currently running, as well as answer questions such as "How many of my users have received my latest update?".
 
-- **Total** - The total number of successful installations that this update has received overall. This number only ever increases as new users/devices install it, and therefore, this is always a superset of the total active count. An update is considered successful once `notifyApplicationReady` (or `sync`) is called after it was installed. Between the moment that an update is downloaded, and it is marked as being successful, it will be reported as a "pending" update (see below for details).
+- **Total** - The total number of successful installations that this update has received overall. This number only ever increases as new users/devices install it, and therefore, this is always a superset of the total active count. An update is considered successful once `notifyAppReady`/`notifyApplicationReady` (or `sync`) is called after it was installed. Between the moment that an update is downloaded, and it is marked as being successful, it will be reported as a "pending" update (see below for details).
 
-- **Pending** - The number of times this release has been downloaded, but not yet installed (i.e. the app was restarted to apply the changes). Therefore, this metric increases as updates are downloaded, and decreases as those corresponding downloaded updates are installed. This metric primarily applies to updates that aren't configured to install immediately, and helps provide the broader picture of release adoption for apps that rely on app resume and/or restart to apply an update (e.g. I want to rollback an update and I'm curious if anyone has downloaded it yet). If you've configured updates to install immediately, and are still seeing pending updates being reported, then it's likely that you're not calling `notifyApplicationReady` (or `sync`) on app start, which is the method that initiates sending install reports and marks installed updates as being considered successful.
+- **Pending** - The number of times this release has been downloaded, but not yet installed (i.e. the app was restarted to apply the changes). Therefore, this metric increases as updates are downloaded, and decreases as those corresponding downloaded updates are installed. This metric primarily applies to updates that aren't configured to install immediately, and helps provide the broader picture of release adoption for apps that rely on app resume and/or restart to apply an update (e.g. I want to rollback an update and I'm curious if anyone has downloaded it yet). If you've configured updates to install immediately, and are still seeing pending updates being reported, then it's likely that you're not calling `notifyAppReady`/`notifyApplicationReady` (or `sync`) on app start, which is the method that initiates sending install reports and marks installed updates as being considered successful.
 
 - **Rollbacks** - The number of times that this release has been automatically rolled back on the client. Ideally this number should be zero, and in that case, this metric isn't even shown. However, if you released an update that includes a crash as part of the installation process, the CodePush plugin will roll the end-user back to the previous release, and report that issue back to the server. This allows your end-users to remain unblocked in the event of broken releases, and by being able to see this telemetry in the CLI, you can identify erroneous releases and respond to them by [rolling it back](https://github.com/codemagic-ci-cd/code-push-pro?tab=readme-ov-file#rolling-back-updates) on the server.
 
@@ -166,7 +149,7 @@ The install metrics have the following meaning:
 
 - **Disabled** - Indicates whether the release has been marked as disabled or not, and therefore, is downloadable by end users. This property will only be displayed for releases that are actually disabled.
 
-When the metrics cell reports `No installs recorded`, that indicates that the server hasn't seen any activity for this release. This could either be because it precluded the plugin versions that included telemetry support, or no end-users have synchronized with the CodePush server yet. As soon as an install happens, you will begin to see metrics populate in the CLI for the release.
+When the metrics cell reports `No installs recorded`, that indicates that the server hasn't seen any install activity for this release. This could be because no end-users have synchronized with the CodePush server yet, or because the client is not reporting successful installs by calling `notifyAppReady`/`notifyApplicationReady` (or `sync`). As soon as an install is reported, you will begin to see metrics populate in the CLI for the release.
 
 ## Releasing Updates
 
@@ -262,11 +245,11 @@ _NOTE: This parameter can be set using either "--disabled" or "-x"_
 
 #### Mandatory parameter
 
-This specifies whether the update should be considered mandatory or not (e.g. it includes a critical security fix). This attribute is simply round tripped to the client, who can then decide if and how they would like to enforce it.
+This specifies whether the update should be considered mandatory or not (e.g. it includes a critical security fix). The client applies mandatory updates according to its install mode configuration.
 
 _NOTE: This parameter is simply a "flag", and therefore, its absence indicates that the release is optional, and its presence indicates that it's mandatory. You can provide a value to it (e.g. `--mandatory true`), however, simply specifying `--mandatory` is sufficient for marking a release as mandatory._
 
-The mandatory attribute is unique because the server will dynamically modify it as necessary in order to ensure that the semantics of your releases are maintained for your end-users. For example, imagine that you released the following three updates to your app:
+The mandatory attribute is unique because the server can dynamically treat an update as mandatory when responding to end-users, in order to ensure that the semantics of your releases are maintained. For example, imagine that you released the following three updates to your app:
 
 | Release | Mandatory? |
 | ------- | ---------- |
@@ -274,11 +257,11 @@ The mandatory attribute is unique because the server will dynamically modify it 
 | v2      | Yes        |
 | v3      | No         |
 
-If an end-user is currently running `v1`, and they query the server for an update, it will respond with `v3` (since that is the latest), but it will dynamically convert the release to mandatory, since a mandatory update was released in between. This behavior is important since the code contained in `v3` is incremental to that included in `v2`, and therefore, whatever made `v2` mandatory, continues to make `v3` mandatory for anyone that didn't already acquire `v2`.
+If an end-user is currently running `v1`, and they query the server for an update, it will respond with `v3` (since that is the latest), but the update will be treated as mandatory, since a mandatory update was released in between. This behavior is important since the code contained in `v3` is incremental to that included in `v2`, and therefore, whatever made `v2` mandatory, continues to make `v3` mandatory for anyone that didn't already acquire `v2`.
 
-If an end-user is currently running `v2`, and they query the server for an update, it will respond with `v3`, but leave the release as optional. This is because they already received the mandatory update, and therefore, there isn't a need to modify the policy of `v3`. This behavior is why we say that the server will "dynamically convert" the mandatory flag, because as far as the release goes, its mandatory attribute will always be stored using the value you specified when releasing it. It is only changed on-the-fly as necessary when responding to an update check from an end-user.
+If an end-user is currently running `v2`, and they query the server for an update, it will respond with `v3`, but leave the update as optional. This is because they already received the mandatory update, and therefore, there isn't a need to modify the policy of `v3`. As far as the release goes, its mandatory attribute will always be stored using the value you specified when releasing it. It is only adjusted on-the-fly as necessary when responding to an update check from an end-user.
 
-If you never release an update that is marked as mandatory, then the above behavior doesn't apply to you, since the server will never change an optional release to mandatory unless there were intermingled mandatory updates as illustrated above. Additionally, if a release is marked as mandatory, it will never be converted to optional, since that wouldn't make any sense. The server will only change an optional release to mandatory in order to respect the semantics described above.
+If you never release an update that is marked as mandatory, then the above behavior doesn't apply to you, since the server will never treat an optional release as mandatory unless there were intermingled mandatory updates as illustrated above. Additionally, if a release is marked as mandatory, it will never be treated as optional, since that wouldn't make any sense. The server will only treat an optional release as mandatory in order to respect the semantics described above.
 
 _NOTE: This parameter can be set using either `--mandatory` or `-m`_
 
@@ -287,8 +270,6 @@ _NOTE: This parameter can be set using either `--mandatory` or `-m`_
 This specifies that if the update is identical to the latest release on the deployment, the CLI should generate a warning instead of an error. This is useful for continuous integration scenarios where it is expected that small modifications may trigger releases where no production code has changed.
 
 #### Rollout parameter
-
-**IMPORTANT: In order for this parameter to actually take affect, your end users need to be running version `1.9.0-beta+` (for React Native) of the CodePush plugin. If you release an update that specifies a rollout property, no end user running an older version of React Native plugins will be eligible for the update. Therefore, until you have adopted the neccessary version of the platform-specific CodePush plugin (as previously mentioned), we would advise not setting a rollout value on your releases, since no one would end up receiving it.**
 
 This specifies the percentage of users (as an integer between `1` and `100`) that should be eligible to receive this update. It can be helpful if you want to "flight" new releases with a portion of your audience (e.g. 25%), and get feedback and/or watch for exceptions/crashes, before making it broadly available for everyone. If this parameter isn't set, it is set to `100%`, and therefore, you only need to set it if you want to actually limit how many users will receive it.
 
@@ -330,7 +311,7 @@ code-push release-react <appName> <platform>
 [--buildConfigurationName <buildConfigurationName>]
 ```
 
-The `release-react` command is a React Native-specific version of the "vanilla" [`release`](#releasing-app-updates) command, which supports all of the same parameters (e.g. `--mandatory`, `--description`), yet simplifies the process of releasing updates by performing the following additional behavior:
+The `release-react` command is a React Native-specific version of the "vanilla" [`release`](#releasing-updates-general) command, which supports all of the same parameters (e.g. `--mandatory`, `--description`), yet simplifies the process of releasing updates by performing the following additional behavior:
 
 1. Running the `react-native bundle` command in order to generate the [update contents](#update-contents-parameter) (JS bundle and assets) that will be released to the CodePush server. It uses sensible defaults as much as possible (e.g. creating a non-dev build, assuming an iOS entry file is named `index.ios.js`), but also exposes the relevant `react-native bundle` parameters to enable flexibility (e.g. `--sourcemapOutput`).
 
@@ -406,17 +387,17 @@ This is the same parameter as the one described in the [above section](#disabled
 
 #### Entry file parameter
 
-This specifies the relative path to the app's root/entry JavaScript file. If left unspecified, this defaults to `index.ios.js` (for iOS), `index.android.js` (for Android) or `index.windows.bundle` (for Windows) if that file exists, or `index.js` otherwise.
+This specifies the relative path to the app's root/entry JavaScript file. If left unspecified, this defaults to `index.ios.js` (for iOS), `index.android.js` (for Android) or `index.windows.js` (for Windows) if that file exists, or `index.js` otherwise.
 
 _NOTE: This parameter can be set using either --entryFile or -e_
 
 #### Gradle file parameter (Android only)
 
-This specifies the relative path to the `build.gradle` file that the CLI should use when attempting to auto-detect the target binary version for the release. This parameter is only meant for advanced scenarios, since the CLI will automatically be able to find your `build.grade` file in "standard" React Native projects. However, if your gradle file is located in an arbitrary location, that the CLI can't discover, then using this parameter allows you to continue releasing CodePush updates, without needing to explicitly set the `--targetBinaryVersion` parameter. Since `build.gradle` is a required file name, specifying the path to the containing folder or the full path to the file itself will both achieve the same effect.
+This specifies the relative path to the `build.gradle` file that the CLI should use when attempting to auto-detect the target binary version for the release. This parameter is only meant for advanced scenarios, since the CLI will automatically be able to find your `build.gradle` file in "standard" React Native projects. However, if your gradle file is located in an arbitrary location, that the CLI can't discover, then using this parameter allows you to continue releasing CodePush updates, without needing to explicitly set the `--targetBinaryVersion` parameter. Since `build.gradle` is a required file name, specifying the path to the containing folder or the full path to the file itself will both achieve the same effect.
 
 ```shell
-code-push release-react MyApp-Android android -p "./foo/bar/"
-code-push release-react MyApp-Android android -p "./foo/bar/build.gradle"
+code-push release-react MyApp-Android android -g "./foo/bar/"
+code-push release-react MyApp-Android android -g "./foo/bar/build.gradle"
 ```
 
 #### Plist file parameter (iOS only)
@@ -431,7 +412,7 @@ _NOTE: This parameter can be set using either --plistFile or -p_
 
 #### Plist file prefix parameter (iOS only)
 
-This specifies the file name prefix of the `Info.plist` file that that CLI should use when attempting to auto-detect the target binary version for the release. This can be useful if you've created per-environment plist files (e.g. `DEV-Info.plist`, `STAGING-Info.plist`), and you want to be able to release CodePush updates without needing to explicitly set the `--targetBinaryVersion` parameter. By specifying a `--plistFilePrefx`, the CLI will look for a file named `<prefix>-Info.plist`, instead of simply `Info.plist` (which is the default behavior), in the following locations: `./ios` and `./ios/<appName>`. If your plist file isn't located in either of those directories (e.g. your app is a native iOS app with embedded RN views), or uses an entirely different file naming convention, then consider using the `--plistFile` parameter.
+This specifies the file name prefix of the `Info.plist` file that the CLI should use when attempting to auto-detect the target binary version for the release. This can be useful if you've created per-environment plist files (e.g. `DEV-Info.plist`, `STAGING-Info.plist`), and you want to be able to release CodePush updates without needing to explicitly set the `--targetBinaryVersion` parameter. By specifying a `--plistFilePrefix`, the CLI will look for a file named `<prefix>-Info.plist`, instead of simply `Info.plist` (which is the default behavior), in the following locations: `./ios` and `./ios/<appName>`. If your plist file isn't located in either of those directories (e.g. your app is a native iOS app with embedded RN views), or uses an entirely different file naming convention, then consider using the `--plistFile` parameter.
 
 ```shell
 # Auto-detect the target binary version of this release by looking up the
@@ -453,7 +434,7 @@ _NOTE: This parameter can be set using either --sourcemapOutput or -s_
 
 #### Output directory parameter
 
-This specifies the relative path to where the assets, JS bundle and sourcemap files should be written. If left unspecified, the assets, JS bundle and sourcemap will be copied to the `/tmp/CodePush` folder.
+This specifies the relative path to where the assets, JS bundle and sourcemap files should be written. If left unspecified, the CLI uses a temporary `/tmp/CodePush` folder and removes it after the release.
 
 _NOTE: This parameter can be set using either --outputDir or -o_
 
@@ -461,13 +442,13 @@ _NOTE: This parameter can be set using either --outputDir or -o_
 
 This parameter enforces the use of the Hermes compiler. If not specified, the automatic checks will be performed, inspecting the `build.gradle` and `Podfile` for the Hermes flag.
 
-_NOTE: This parameter can be set using either --hermesEnabled or -h_
+_NOTE: This parameter can be set using either --useHermes or -h_
 
 #### Podfile parameter (iOS only)
 
 The Podfile path will be used for Hermes automatic check. Not used if `--useHermes` is specified.
 
-_NOTE: This parameter can be set using either --podfile or -pod_
+_NOTE: This parameter can be set using either --podFile or --pod_
 
 #### Extra hermes flags parameter
 
@@ -507,7 +488,7 @@ Once you've released an update, React Native plugin has been integrated into you
 code-push debug <platform>
 
 # View all CodePush logs from a running
-# instace of the iOS simulator.
+# instance of the iOS simulator.
 code-push debug ios
 
 # View all CodePush logs from a running
@@ -519,7 +500,7 @@ code-push debug android
 
 Under the covers, this command simply automates the usage of the iOS system logs and ADB logcat, but provides a platform-agnostic, filtered view of all logs coming from the CodePush plugin. This way, you don't need to learn and/or use another tool simply to be able to answer basic questions about how CodePush is behaving.
 
-_NOTE: The debug command supports both emulators and devices for Android, but currently only supports listening to logs from the iOS simulator. We hope to add device support soon._
+_NOTE: The debug command supports both emulators and devices for Android, but currently only supports listening to logs from the iOS simulator. Physical iOS devices are not supported by the CLI debug command._
 
 ## Patching Update Metadata
 
@@ -535,7 +516,7 @@ code-push patch <appName> <deploymentName>
 [--targetBinaryVersion <targetBinaryVersion>]
 ```
 
-_NOTE: This command doesn't allow modifying the actual update contents of a release. If you need to respond to a release that has been identified as being broken, you should use the [rollback](#rolling-back-updates) command to immediately roll it back, and then if necessary, release a new update with the approrpriate fix when it is available._
+_NOTE: This command doesn't allow modifying the actual update contents of a release. If you need to respond to a release that has been identified as being broken, you should use the [rollback](#rolling-back-updates) command to immediately roll it back, and then if necessary, release a new update with the appropriate fix when it is available._
 
 Aside from the `appName` and `deploymentName`, all parameters are optional, and therefore, you can use this command to update just a single attribute or all of them at once. Calling the `patch` command without specifying any attribute flag will result in a no-op.
 
@@ -544,36 +525,36 @@ Aside from the `appName` and `deploymentName`, all parameters are optional, and 
 code-push patch MyApp-iOS Production -m
 
 # Increase the rollout for v23 to 50%
-code-push patch MyApp-iOS Production -l v23 -rollout 50%
+code-push patch MyApp-iOS Production -l v23 --rollout 50%
 ```
 
 ### Label parameter
 
-Indicates which release (e.g. `v23`) you want to update within the specified deployment. If ommitted, the requested changes will be applied to the latest release in the specified deployment. In order to look up the label for the release you want to update, you can run the `code-push deployment history` command and refer to the `Label` column.
+Indicates which release (e.g. `v23`) you want to update within the specified deployment. If omitted, the requested changes will be applied to the latest release in the specified deployment. In order to look up the label for the release you want to update, you can run the `code-push deployment history` command and refer to the `Label` column.
 
 _NOTE: This parameter can be set using either `--label` or `-l`_
 
 ### Mandatory parameter
 
-This is the same parameter as the one described in the [above section](#mandatory-parameter), and simply allows you to update whether the release should be considered mandatory or not. Note that `--mandatory` and `--mandatory true` are equivalent, but the absence of this flag is not equivalent to `--mandatory false`. Therefore, if the parameter is ommitted, no change will be made to the value of the target release's mandatory property. You need to set this to `--mandatory false` to explicitly make a release optional.
+This is the same parameter as the one described in the [above section](#mandatory-parameter), and simply allows you to update whether the release should be considered mandatory or not. Note that `--mandatory` and `--mandatory true` are equivalent, but the absence of this flag is not equivalent to `--mandatory false`. Therefore, if the parameter is omitted, no change will be made to the value of the target release's mandatory property. You need to set this to `--mandatory false` to explicitly make a release optional.
 
 ### Description parameter
 
-This is the same parameter as the one described in the [above section](#description-parameter), and simply allows you to update the description associated with the release (e.g. you made a typo when releasing, or you forgot to add a description at all). If this parameter is ommitted, no change will be made to the value of the target release's description property.
+This is the same parameter as the one described in the [above section](#description-parameter), and simply allows you to update the description associated with the release (e.g. you made a typo when releasing, or you forgot to add a description at all). If this parameter is omitted, no change will be made to the value of the target release's description property.
 
 ### Disabled parameter
 
-This is the same parameter as the one described in the [above section](#disabled-parameter), and simply allows you to update whether the release should be disabled or not. Note that `--disabled` and `--disabled true` are equivalent, but the absence of this flag is not equivalent to `--disabled false`. Therefore, if the parameter is ommitted, no change will be made to the value of the target release's disabled property. You need to set this to `--disabled false` to explicitly make a release acquirable if it was previously disabled.
+This is the same parameter as the one described in the [above section](#disabled-parameter), and simply allows you to update whether the release should be disabled or not. Note that `--disabled` and `--disabled true` are equivalent, but the absence of this flag is not equivalent to `--disabled false`. Therefore, if the parameter is omitted, no change will be made to the value of the target release's disabled property. You need to set this to `--disabled false` to explicitly make a release acquirable if it was previously disabled.
 
 ### Rollout parameter
 
-This is the same parameter as the one described in the [above section](#rollout-parameter), and simply allows you to increase the rollout percentage of the target release. This parameter can only be set to an integer whose value is greater than the current rollout value. Additionally, if you want to "complete" the rollout, and therefore, make the release available to everyone, you can simply set this parameter to `--rollout 100`. If this parameter is ommitted, no change will be made to the value of the target release's rollout parameter.
+This is the same parameter as the one described in the [above section](#rollout-parameter), and simply allows you to increase the rollout percentage of the target release. This parameter can only be set to an integer whose value is greater than the current rollout value. Additionally, if you want to "complete" the rollout, and therefore, make the release available to everyone, you can simply set this parameter to `--rollout 100`. If this parameter is omitted, no change will be made to the value of the target release's rollout parameter.
 
 Additionally, as mentioned above, when you release an update without a rollout value, it is treated equivalently to setting the rollout to `100`. Therefore, if you released an update without a rollout, you cannot change the rollout property of it via the `patch` command since that would be considered lowering the rollout percentage.
 
 ### Target binary version parameter
 
-This is the same parameter as the one described in the [above section](#target-binary-version-parameter), and simply allows you to update the semver range that indicates which binary version(s) a release is compatible with. This can be useful if you made a mistake when originally releasing an update (e.g. you specified `1.0.0` but meant `1.1.0`) or you want to increase or decrease the version range that a release supports (e.g. you discovered that a release doesn't work with `1.1.2` after all). If this parameter is ommitted, no change will be made to the value of the target release's version property.
+This is the same parameter as the one described in the [above section](#target-binary-version-parameter), and simply allows you to update the semver range that indicates which binary version(s) a release is compatible with. This can be useful if you made a mistake when originally releasing an update (e.g. you specified `1.0.0` but meant `1.1.0`) or you want to increase or decrease the version range that a release supports (e.g. you discovered that a release doesn't work with `1.1.2` after all). If this parameter is omitted, no change will be made to the value of the target release's version property.
 
 ```shell
 # Add a "max binary version" to an existing release
@@ -593,7 +574,7 @@ code-push promote <appName> <sourceDeploymentName> <destDeploymentName>
 [--mandatory]
 [--noDuplicateReleaseError]
 [--rollout <rolloutPercentage>]
-[--targetBinaryVersion <targetBinaryVersion]
+[--targetBinaryVersion <targetBinaryVersion>]
 ```
 
 The `promote` command will create a new release for the destination deployment, which includes the **exact code and metadata** (description, mandatory and target binary version) from the latest release of the source deployment. While you could use the `release` command to "manually" migrate an update from one environment to another, the `promote` command has the following benefits:
@@ -712,7 +693,7 @@ Code Signing ensures that updates deployed via CodePush are secure and verified.
 
 ```shell
 # generate private RSA key and write it to private.pem file
-openssl genrsa -out private.pem
+openssl genrsa -out private.pem 2048
 
 # export public key from private.pem into public.pem
 openssl rsa -pubout -in private.pem -out public.pem

@@ -1,0 +1,5 @@
+platform :ios, '13.0'
+
+target 'TestApp' do
+  use_react_native!(:hermes_enabled => false)
+end
