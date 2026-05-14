@@ -8,12 +8,11 @@ The CodePush CLI is a Node.js application that allows users to interact with Cod
 
 ## Getting started
 
-1. Obtain a CodePush access key from Codemagic.
-1. Authenticate the CLI with the access key.
-1. Register your app with CodePush.
-1. Configure your app with the CodePush server URL and deployment key.
+1. Create a CodePush account by contacting the [Codemagic](https://codemagic.io/contact) team.
+1. Register your app with CodePush, and optionally share it with other developers on your team.
+1. CodePush-ify your app and point it at the deployment you wish to use.
 1. Release an update for your app.
-1. Check the debug logs to ensure everything is working as expected.
+1. Check out the debug logs to ensure everything is working as expected.
 
 ## Usage
 
@@ -21,35 +20,31 @@ After installing CodePush CLI globally, it will be available under `code-push`.
 
 ### Authentication
 
-Most CodePush CLI management commands require authentication. Codemagic-managed CodePush authenticates with access keys generated in Codemagic.
-
-To log in interactively, run:
+Most commands within the CodePush CLI require authentication, and therefore, before you can begin managing your account, you need to login using an access token provided by the [Codemagic](https://codemagic.io/contact) team. Then, you can log into your account by running the following command:
 
 ```shell
 code-push login
 ```
 
-The CLI targets `https://codepush.pro` by default and prompts for your access key.
-
-For non-interactive environments such as CI, pass the access key directly:
+The CLI targets `https://codepush.pro` by default and prompts for your access key. For non-interactive environments, you can pass the access key directly:
 
 ```shell
 code-push login --access-key $ACCESS_TOKEN
 ```
 
-For local development, self-hosted servers, or tests, you can still provide an explicit server URL:
+If you need to target another server, you can provide the server URL explicitly:
 
 ```shell
 code-push login <server_url> --access-key $ACCESS_TOKEN
 ```
 
-If at any time you want to determine whether you're already logged in, run:
+If at any time you want to determine if you're already logged in, you can run the following command to display your CodePush account associated with your current authentication session:
 
 ```shell
 code-push whoami
 ```
 
-When you log in from the CLI, your access key is persisted to disk so that you don't have to log in before every command. To remove the local credentials, run:
+When you login from the CLI, your access key is persisted to disk for the duration of your session so that you don't have to login every time you attempt to access your account. In order to end your session and delete this access key, simply run the following command:
 
 ```shell
 code-push logout
