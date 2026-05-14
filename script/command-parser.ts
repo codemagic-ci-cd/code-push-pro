@@ -277,6 +277,7 @@ function deploymentHistory(commandName: string, yargs: yargs.Argv): void {
 }
 
 yargs
+  .scriptName("code-push")
   .usage(USAGE_PREFIX + " <command>")
   .demand(/*count*/ 1, /*max*/ 1) // Require exactly one non-option argument.
   .command("access-key", "View and manage the access keys associated with your account", (yargs: yargs.Argv) => {
@@ -334,7 +335,7 @@ yargs
 
     addCommonConfiguration(yargs);
   })
-  .command("collaborator", "View and manage app collaborators", (yargs: yargs.Argv) => {
+  .command("collaborator", false, (yargs: yargs.Argv) => {
     isValidCommandCategory = true;
     yargs
       .usage(USAGE_PREFIX + " collaborator <command>")
@@ -413,7 +414,7 @@ yargs
 
     addCommonConfiguration(yargs);
   })
-  .command("link", "Link an additional authentication provider (e.g. GitHub) to an existing CodePush account", (yargs: yargs.Argv) => {
+  .command("link", false, (yargs: yargs.Argv) => {
     isValidCommandCategory = true;
     isValidCommand = true;
     yargs
@@ -584,7 +585,7 @@ yargs
 
     addCommonConfiguration(yargs);
   })
-  .command("register", "Register a new CodePush account", (yargs: yargs.Argv) => {
+  .command("register", false, (yargs: yargs.Argv) => {
     isValidCommandCategory = true;
     isValidCommand = true;
     yargs
@@ -858,7 +859,7 @@ yargs
 
     addCommonConfiguration(yargs);
   })
-  .command("session", "View and manage the current login sessions associated with your account", (yargs: yargs.Argv) => {
+  .command("session", false, (yargs: yargs.Argv) => {
     isValidCommandCategory = true;
     yargs
       .usage(USAGE_PREFIX + " session <command>")
