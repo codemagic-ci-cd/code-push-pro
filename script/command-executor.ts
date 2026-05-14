@@ -589,19 +589,35 @@ function link(command: cli.ILinkCommand): Promise<void> {
 }
 
 function login(command: cli.ILoginCommand): Promise<void> {
-  // Check if one of the flags were provided.
   if (command.accessKey) {
-    sdk = getSdk(command.accessKey, CLI_HEADERS, command.serverUrl);
-    return sdk.isAuthenticated().then((isAuthenticated: boolean): void => {
-      if (isAuthenticated) {
-        serializeConnectionInfo(command.accessKey, /*preserveAccessKeyOnLogout*/ true, command.serverUrl);
-      } else {
-        throw new Error("Invalid access key.");
-      }
-    });
-  } else {
-    return loginWithExternalAuthentication("login", command.serverUrl);
+    return loginWithAccessKey(command.accessKey, command.serverUrl, /*preserveAccessKeyOnLogout*/ true);
   }
+
+  return requestAccessKey().then((accessKey: string): Promise<void> => {
+    if (accessKey === null) {
+      // The user has aborted the synchronous prompt (e.g.:  via [CTRL]+[C]).
+      return;
+    }
+
+    return loginWithAccessKey(accessKey, command.serverUrl, /*preserveAccessKeyOnLogout*/ true);
+  });
+}
+
+function loginWithAccessKey(accessKey: string, serverUrl?: string, preserveAccessKeyOnLogout: boolean = true): Promise<void> {
+  accessKey = accessKey ? accessKey.trim() : "";
+
+  if (!accessKey) {
+    throw new Error("An access key must be specified.");
+  }
+
+  sdk = getSdk(accessKey, CLI_HEADERS, serverUrl);
+  return sdk.isAuthenticated().then((isAuthenticated: boolean): void => {
+    if (isAuthenticated) {
+      serializeConnectionInfo(accessKey, preserveAccessKeyOnLogout, serverUrl);
+    } else {
+      throw new Error("Invalid access key.");
+    }
+  });
 }
 
 function loginWithExternalAuthentication(action: string, serverUrl?: string): Promise<void> {
@@ -614,15 +630,7 @@ function loginWithExternalAuthentication(action: string, serverUrl?: string): Pr
       return;
     }
 
-    sdk = getSdk(accessKey, CLI_HEADERS, serverUrl);
-
-    return sdk.isAuthenticated().then((isAuthenticated: boolean): void => {
-      if (isAuthenticated) {
-        serializeConnectionInfo(accessKey, /*preserveAccessKeyOnLogout*/ false, serverUrl);
-      } else {
-        throw new Error("Invalid access key.");
-      }
-    });
+    return loginWithAccessKey(accessKey, serverUrl, /*preserveAccessKeyOnLogout*/ false);
   });
 }
 
@@ -1422,6 +1430,8 @@ function requestAccessKey(): Promise<string> {
         properties: {
           response: {
             description: chalk.cyan("Enter your access key: "),
+            hidden: true,
+            replace: "*",
           },
         },
       },
@@ -1429,7 +1439,7 @@ function requestAccessKey(): Promise<string> {
         if (err) {
           resolve(null);
         } else {
-          resolve(result.response.trim());
+          resolve((result.response || "").trim());
         }
       }
     );

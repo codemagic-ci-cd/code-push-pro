@@ -430,14 +430,13 @@ yargs
     yargs
       .usage(USAGE_PREFIX + " login [options]")
       .demand(/*count*/ 0, /*max*/ 1) //set 'max' to one to allow usage of serverUrl undocument parameter for testing
-      .example("login", "Logs in to the CodePush server")
-      .example("login --accessKey mykey", 'Logs in on behalf of the user who owns and created the access key "mykey"')
-      .option("accessKey", {
+      .example("login", "Prompts for an access key and logs in to the CodePush server")
+      .example("login --access-key mykey", 'Logs in with the access key "mykey"')
+      .option("access-key", {
         alias: "key",
         default: null,
         demand: false,
-        description:
-          "Access key to authenticate against the CodePush server with, instead of providing your username and password credentials",
+        description: "Access key to authenticate against the CodePush server with",
         type: "string",
       })
       .check((argv: any, aliases: { [aliases: string]: string }): any => isValidCommand); // Report unrecognized, non-hyphenated command category.
@@ -1137,7 +1136,7 @@ export function createCommand(): cli.ICommand {
         const loginCommand = <cli.ILoginCommand>cmd;
 
         loginCommand.serverUrl = getServerUrl(arg1);
-        loginCommand.accessKey = argv["accessKey"] as any;
+        loginCommand.accessKey = argv["access-key"] as any;
         break;
 
       case "logout":
