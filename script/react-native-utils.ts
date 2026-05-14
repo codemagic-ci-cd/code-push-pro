@@ -6,24 +6,20 @@ import { coerce, compare, valid } from "semver";
 import { fileDoesNotExistOrIsDirectory } from "./utils/file-utils";
 
 const g2js = require("gradle-to-js/lib/parser");
+const REACT_NATIVE_HERMES_DEFAULT_VERSION = "0.70.0";
 
 export function isValidVersion(version: string): boolean {
   return !!valid(version) || /^\d+\.\d+$/.test(version);
 }
 
 export async function runHermesEmitBinaryCommand(
-    bundleName: string,
-    outputFolder: string,
-    sourcemapOutput: string,
-    extraHermesFlags: string[],
-    gradleFile: string
+  bundleName: string,
+  outputFolder: string,
+  sourcemapOutput: string,
+  extraHermesFlags: string[],
+  gradleFile: string
 ): Promise<void> {
   const hermesArgs: string[] = [];
-  const envNodeArgs: string = process.env.CODE_PUSH_NODE_ARGS;
-
-  if (typeof envNodeArgs !== "undefined") {
-    Array.prototype.push.apply(hermesArgs, envNodeArgs.trim().split(/\s+/));
-  }
 
   Array.prototype.push.apply(hermesArgs, [
     "-emit-binary",
@@ -43,6 +39,8 @@ export async function runHermesEmitBinaryCommand(
   console.log(`${hermesCommand} ${hermesArgs.join(" ")}`);
 
   return new Promise<void>((resolve, reject) => {
+    let hermesProcessError: Error = null;
+
     hermesProcess.stdout.on("data", (data: Buffer) => {
       console.log(data.toString().trim());
     });
@@ -51,10 +49,21 @@ export async function runHermesEmitBinaryCommand(
       console.error(data.toString().trim());
     });
 
+    hermesProcess.on("error", (err: Error) => {
+      hermesProcessError = err;
+      reject(new Error(`Failed to run Hermes compiler "${hermesCommand}": ${err.message}`));
+    });
+
     hermesProcess.on("close", (exitCode: number, signal: string) => {
+      if (hermesProcessError) {
+        return;
+      }
+
       if (exitCode !== 0) {
         reject(new Error(`"hermes" command failed (exitCode=${exitCode}, signal=${signal}).`));
+        return;
       }
+
       // Copy HBC bundle to overwrite JS bundle
       const source = path.join(outputFolder, bundleName + ".hbc");
       const destination = path.join(outputFolder, bundleName);
@@ -62,12 +71,16 @@ export async function runHermesEmitBinaryCommand(
         if (err) {
           console.error(err);
           reject(new Error(`Copying file ${source} to ${destination} failed. "hermes" previously exited with code ${exitCode}.`));
+          return;
         }
+
         fs.unlink(source, (err) => {
           if (err) {
             console.error(err);
             reject(err);
+            return;
           }
+
           resolve(null as void);
         });
       });
@@ -125,11 +138,8 @@ export async function runHermesEmitBinaryCommand(
 }
 
 function parseBuildGradleFile(gradleFile: string) {
-  let buildGradlePath: string = path.join("android", "app");
-  if (gradleFile) {
-    buildGradlePath = gradleFile;
-  }
-  if (fs.lstatSync(buildGradlePath).isDirectory()) {
+  let buildGradlePath: string = getBuildGradlePath(gradleFile);
+  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
     buildGradlePath = path.join(buildGradlePath, "build.gradle");
   }
 
@@ -140,6 +150,19 @@ function parseBuildGradleFile(gradleFile: string) {
   return g2js.parseFile(buildGradlePath).catch(() => {
     throw new Error(`Unable to parse the "${buildGradlePath}" file. Please ensure it is a well-formed Gradle file.`);
   });
+}
+
+function getBuildGradlePath(gradleFile: string): string {
+  let buildGradlePath: string = path.join("android", "app");
+  if (gradleFile) {
+    buildGradlePath = gradleFile;
+  }
+
+  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
+    return path.join(buildGradlePath, "build.gradle");
+  }
+
+  return buildGradlePath;
 }
 
 async function getHermesCommandFromGradle(gradleFile: string): Promise<string> {
@@ -154,10 +177,43 @@ async function getHermesCommandFromGradle(gradleFile: string): Promise<string> {
   }
 }
 
-export function getAndroidHermesEnabled(gradleFile: string): boolean {
-  return parseBuildGradleFile(gradleFile).then((buildGradle: any) => {
-    return Array.from(buildGradle["project.ext.react"] || []).some((line: string) => /^enableHermes\s{0,}:\s{0,}true/.test(line));
-  });
+function getLegacyAndroidHermesEnabled(buildGradle: any): boolean | null {
+  const hermesEnabledProperty = Array.from(buildGradle["project.ext.react"] || []).find((line: string) =>
+    /^enableHermes\s*:\s*(true|false)\b/.test(line)
+  ) as string;
+
+  if (hermesEnabledProperty) {
+    return /:\s*true\b/.test(hermesEnabledProperty);
+  }
+
+  return null;
+}
+
+export async function getAndroidHermesEnabled(gradleFile: string): Promise<boolean> {
+  const gradlePropertiesPath = path.join("android", "gradle.properties");
+  if (fs.existsSync(gradlePropertiesPath)) {
+    const gradlePropertiesContents = fs.readFileSync(gradlePropertiesPath).toString();
+    const hermesEnabledMatch = gradlePropertiesContents.match(/^\s*hermesEnabled\s*=\s*(true|false)\s*$/im);
+    if (hermesEnabledMatch) {
+      return hermesEnabledMatch[1].toLowerCase() === "true";
+    }
+  }
+
+  const buildGradlePath = getBuildGradlePath(gradleFile);
+  if (fs.existsSync(buildGradlePath) && fs.readFileSync(buildGradlePath).toString().indexOf("enableHermes") !== -1) {
+    const buildGradle: any = await parseBuildGradleFile(gradleFile);
+    const legacyHermesEnabled = getLegacyAndroidHermesEnabled(buildGradle);
+    if (legacyHermesEnabled !== null) {
+      return legacyHermesEnabled;
+    }
+  }
+
+  const reactNativeVersion = coerce(getReactNativeVersion());
+  if (reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getiOSHermesEnabled(podFile: string): boolean {
@@ -166,12 +222,26 @@ export function getiOSHermesEnabled(podFile: string): boolean {
     podPath = podFile;
   }
   if (fileDoesNotExistOrIsDirectory(podPath)) {
-    throw new Error(`Unable to find Podfile file "${podPath}".`);
+    if (podFile) {
+      throw new Error(`Unable to find Podfile file "${podPath}".`);
+    }
+
+    const reactNativeVersion = coerce(getReactNativeVersion());
+    return !!reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0;
   }
 
   try {
     const podFileContents = fs.readFileSync(podPath).toString();
-    return /([^#\n]*:?hermes_enabled(\s+|\n+)?(=>|:)(\s+|\n+)?true)/.test(podFileContents);
+    if (/^[^#\n]*:?\bhermes_enabled\b\s*(=>|:)\s*false\b/im.test(podFileContents)) {
+      return false;
+    }
+
+    if (/^[^#\n]*:?\bhermes_enabled\b\s*(=>|:)\s*true\b/im.test(podFileContents)) {
+      return true;
+    }
+
+    const reactNativeVersion = coerce(getReactNativeVersion());
+    return !!reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0;
   } catch (error) {
     throw error;
   }
@@ -192,7 +262,8 @@ function getHermesOSBin(): string {
 }
 
 function getHermesOSExe(): string {
-  const react63orAbove = compare(coerce(getReactNativeVersion()).version, "0.63.0") !== -1;
+  const reactNativeVersion = coerce(getReactNativeVersion());
+  const react63orAbove = !!reactNativeVersion && compare(reactNativeVersion.version, "0.63.0") !== -1;
   const hermesExecutableName = react63orAbove ? "hermesc" : "hermes";
   switch (process.platform) {
     case "win32":
@@ -210,23 +281,34 @@ async function getHermesCommand(gradleFile: string): Promise<string> {
       return false;
     }
   };
+
+  const buildGradlePath = getBuildGradlePath(gradleFile);
+
+  if (fs.existsSync(buildGradlePath) && fs.readFileSync(buildGradlePath).toString().indexOf("hermesCommand") !== -1) {
+    const gradleHermesCommand = await getHermesCommandFromGradle(gradleFile);
+    if (gradleHermesCommand) {
+      return path.join("android", "app", gradleHermesCommand.replace("%OS-BIN%", getHermesOSBin()));
+    }
+  }
+
+  const hermesCompilerExe = process.platform === "win32" ? "hermesc.exe" : "hermesc";
+  const hermesCompiler = path.join("node_modules", "hermes-compiler", "hermesc", getHermesOSBin(), hermesCompilerExe);
+  if (fileExists(hermesCompiler)) {
+    return hermesCompiler;
+  }
+
   // Hermes is bundled with react-native since 0.69
   const bundledHermesEngine = path.join(getReactNativePackagePath(), "sdks", "hermesc", getHermesOSBin(), getHermesOSExe());
   if (fileExists(bundledHermesEngine)) {
     return bundledHermesEngine;
   }
 
-  const gradleHermesCommand = await getHermesCommandFromGradle(gradleFile);
-  if (gradleHermesCommand) {
-    return path.join("android", "app", gradleHermesCommand.replace("%OS-BIN%", getHermesOSBin()));
-  } else {
-    // assume if hermes-engine exists it should be used instead of hermesvm
-    const hermesEngine = path.join("node_modules", "hermes-engine", getHermesOSBin(), getHermesOSExe());
-    if (fileExists(hermesEngine)) {
-      return hermesEngine;
-    }
-    return path.join("node_modules", "hermesvm", getHermesOSBin(), "hermes");
+  // assume if hermes-engine exists it should be used instead of hermesvm
+  const hermesEngine = path.join("node_modules", "hermes-engine", getHermesOSBin(), getHermesOSExe());
+  if (fileExists(hermesEngine)) {
+    return hermesEngine;
   }
+  return path.join("node_modules", "hermesvm", getHermesOSBin(), "hermes");
 }
 
 function getComposeSourceMapsPath(): string {
@@ -240,7 +322,7 @@ function getComposeSourceMapsPath(): string {
 
 function getReactNativePackagePath(): string {
   const result = childProcess.spawnSync("node", ["--print", "require.resolve('react-native/package.json')"]);
-  const packagePath = path.dirname(result.stdout.toString());
+  const packagePath = path.dirname(result.stdout.toString().trim());
   if (result.status === 0 && directoryExistsSync(packagePath)) {
     return packagePath;
   }
@@ -274,6 +356,16 @@ export function getReactNativeVersion(): string {
   const projectName: string = projectPackageJson.name;
   if (!projectName) {
     throw new Error(`The "package.json" file in the CWD does not have the "name" field set.`);
+  }
+
+  try {
+    const reactNativePackageJsonFilename = path.join(getReactNativePackagePath(), "package.json");
+    const reactNativePackageJson = JSON.parse(fs.readFileSync(reactNativePackageJsonFilename, "utf-8"));
+    if (reactNativePackageJson.version) {
+      return reactNativePackageJson.version;
+    }
+  } catch (error) {
+    // Fall back to the app package.json dependency range below.
   }
 
   return (
