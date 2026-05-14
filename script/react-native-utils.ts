@@ -6,7 +6,7 @@ import { coerce, compare, valid } from "semver";
 import { fileDoesNotExistOrIsDirectory } from "./utils/file-utils";
 
 const g2js = require("gradle-to-js/lib/parser");
-const REACT_NATIVE_HERMES_DEFAULT_VERSION = "0.84.0";
+const REACT_NATIVE_HERMES_DEFAULT_VERSION = "0.70.0";
 
 export function isValidVersion(version: string): boolean {
   return !!valid(version) || /^\d+\.\d+$/.test(version);
@@ -177,6 +177,11 @@ export async function getAndroidHermesEnabled(gradleFile: string): Promise<boole
     }
   }
 
+  const reactNativeVersion = coerce(getReactNativeVersion());
+  if (reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0) {
+    return true;
+  }
+
   if (gradleFile || fs.existsSync(path.join("android", "app", "build.gradle"))) {
     const buildGradle: any = await parseBuildGradleFile(gradleFile);
     const legacyHermesEnabled = Array.from(buildGradle["project.ext.react"] || []).some((line: string) =>
@@ -187,8 +192,7 @@ export async function getAndroidHermesEnabled(gradleFile: string): Promise<boole
     }
   }
 
-  const reactNativeVersion = coerce(getReactNativeVersion());
-  return !!reactNativeVersion && compare(reactNativeVersion.version, REACT_NATIVE_HERMES_DEFAULT_VERSION) >= 0;
+  return false;
 }
 
 export function getiOSHermesEnabled(podFile: string): boolean {
@@ -257,6 +261,18 @@ async function getHermesCommand(gradleFile: string): Promise<string> {
     }
   };
 
+  let buildGradlePath = gradleFile || path.join("android", "app", "build.gradle");
+  if (fs.existsSync(buildGradlePath) && fs.lstatSync(buildGradlePath).isDirectory()) {
+    buildGradlePath = path.join(buildGradlePath, "build.gradle");
+  }
+
+  if (fs.existsSync(buildGradlePath) && fs.readFileSync(buildGradlePath).toString().indexOf("hermesCommand") !== -1) {
+    const gradleHermesCommand = await getHermesCommandFromGradle(gradleFile);
+    if (gradleHermesCommand) {
+      return path.join("android", "app", gradleHermesCommand.replace("%OS-BIN%", getHermesOSBin()));
+    }
+  }
+
   const hermesCompilerExe = process.platform === "win32" ? "hermesc.exe" : "hermesc";
   const hermesCompiler = path.join("node_modules", "hermes-compiler", "hermesc", getHermesOSBin(), hermesCompilerExe);
   if (fileExists(hermesCompiler)) {
@@ -269,17 +285,12 @@ async function getHermesCommand(gradleFile: string): Promise<string> {
     return bundledHermesEngine;
   }
 
-  const gradleHermesCommand = await getHermesCommandFromGradle(gradleFile);
-  if (gradleHermesCommand) {
-    return path.join("android", "app", gradleHermesCommand.replace("%OS-BIN%", getHermesOSBin()));
-  } else {
-    // assume if hermes-engine exists it should be used instead of hermesvm
-    const hermesEngine = path.join("node_modules", "hermes-engine", getHermesOSBin(), getHermesOSExe());
-    if (fileExists(hermesEngine)) {
-      return hermesEngine;
-    }
-    return path.join("node_modules", "hermesvm", getHermesOSBin(), "hermes");
+  // assume if hermes-engine exists it should be used instead of hermesvm
+  const hermesEngine = path.join("node_modules", "hermes-engine", getHermesOSBin(), getHermesOSExe());
+  if (fileExists(hermesEngine)) {
+    return hermesEngine;
   }
+  return path.join("node_modules", "hermesvm", getHermesOSBin(), "hermes");
 }
 
 function getComposeSourceMapsPath(): string {

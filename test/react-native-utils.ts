@@ -97,6 +97,12 @@ describe("react-native-utils", () => {
     assert.equal(await getAndroidHermesEnabled(null), true);
   });
 
+  it("treats Android React Native 0.70 projects without explicit Hermes config as Hermes-enabled", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.70.0");
+
+    assert.equal(await getAndroidHermesEnabled(null), true);
+  });
+
   it("honors Android hermesEnabled=false in gradle.properties", async (): Promise<void> => {
     writeReactNativeProject(projectPath, "0.84.1");
     writeFile(path.join(projectPath, "android", "gradle.properties"), "hermesEnabled=false");
@@ -112,7 +118,7 @@ describe("react-native-utils", () => {
   });
 
   it("keeps legacy Android project.ext.react.enableHermes detection", async (): Promise<void> => {
-    writeReactNativeProject(projectPath, "0.83.0");
+    writeReactNativeProject(projectPath, "0.69.0");
     writeFile(
       path.join(projectPath, "android", "app", "build.gradle"),
       `
@@ -131,10 +137,17 @@ android {
     assert.equal(await getAndroidHermesEnabled(null), true);
   });
 
-  it("leaves Android React Native versions below 0.84 disabled without explicit Hermes config", async (): Promise<void> => {
-    writeReactNativeProject(projectPath, "0.83.0");
+  it("leaves Android React Native versions below 0.70 disabled without explicit Hermes config", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.69.0");
 
     assert.equal(await getAndroidHermesEnabled(null), false);
+  });
+
+  it("uses React Native 0.70 default Hermes without parsing complex Android Gradle files", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.70.0");
+    writeFile(path.join(projectPath, "android", "app", "build.gradle"), "not a parseable Gradle file [");
+
+    assert.equal(await getAndroidHermesEnabled(null), true);
   });
 
   it("honors iOS Podfile hermes_enabled=false", (): void => {
@@ -156,6 +169,20 @@ android {
     writeFile(path.join(projectPath, "ios", "Podfile"), `use_react_native!(:path => "../node_modules/react-native")`);
 
     assert.equal(getiOSHermesEnabled(null), true);
+  });
+
+  it("treats iOS React Native 0.70 projects without explicit Hermes config as Hermes-enabled", (): void => {
+    writeReactNativeProject(projectPath, "0.70.0");
+    writeFile(path.join(projectPath, "ios", "Podfile"), `use_react_native!(:path => "../node_modules/react-native")`);
+
+    assert.equal(getiOSHermesEnabled(null), true);
+  });
+
+  it("leaves iOS React Native versions below 0.70 disabled without explicit Hermes config", (): void => {
+    writeReactNativeProject(projectPath, "0.69.0");
+    writeFile(path.join(projectPath, "ios", "Podfile"), `use_react_native!(:path => "../node_modules/react-native")`);
+
+    assert.equal(getiOSHermesEnabled(null), false);
   });
 
   it("prefers hermes-compiler and does not pass CODE_PUSH_NODE_ARGS to Hermes", async (): Promise<void> => {
@@ -203,5 +230,46 @@ android {
       path.join(outputFolder, bundleName),
     ]);
     assert.equal(fs.readFileSync(path.join(outputFolder, bundleName), "utf-8"), "compiled hermes bundle");
+  });
+
+  it("uses explicit Gradle hermesCommand before package autodetection", async (): Promise<void> => {
+    writeReactNativeProject(projectPath, "0.84.1");
+    const customHermesCommand = path.join("..", "..", "custom-hermes", "%OS-BIN%", getHermesCompilerExe());
+    writeFile(
+      path.join(projectPath, "android", "app", "build.gradle"),
+      `
+project.ext.react = [
+    hermesCommand: "${customHermesCommand}",
+]
+`
+    );
+    writeFile(
+      path.join(projectPath, "node_modules", "hermes-compiler", "hermesc", getHermesOSBin(), getHermesCompilerExe()),
+      ""
+    );
+
+    const outputFolder = path.join(projectPath, "CodePush");
+    const bundleName = "index.android.bundle";
+    writeFile(path.join(outputFolder, bundleName), "plain js bundle");
+
+    const spawn = sandbox.stub(childProcess, "spawn").callsFake((command: string, args: string[]): any => {
+      const outputIndex = args.indexOf("-out");
+      fs.writeFileSync(args[outputIndex + 1], "compiled hermes bundle");
+
+      return {
+        stdout: { on: () => {} },
+        stderr: { on: () => {} },
+        on: (event: string, callback: Function) => {
+          if (event === "close") {
+            callback(0, null);
+          }
+        },
+      };
+    });
+
+    await runHermesEmitBinaryCommand(bundleName, outputFolder, null, [], null);
+
+    sinon.assert.calledOnce(spawn);
+    assert.equal(spawn.args[0][0], path.join("android", "app", customHermesCommand.replace("%OS-BIN%", getHermesOSBin())));
   });
 });
